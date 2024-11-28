@@ -4,18 +4,21 @@
     <title>PDF Q&A App</title>
 </head>
 <body>
-    <h1>PDF Q&A App</h1>
-    <form method="post" enctype="multipart/form-data">
-        {% if "pdf_text" not in session %}
-            <label for="file">Upload PDF:</label><br>
-            <input type="file" name="file" id="file" required><br><br>
-        {% endif %}
 
-        <!-- <input type="file" name="file" required><br><br> -->
-        <input type="text" name="question" placeholder="Enter your question" required><br><br>
-        <input type="submit" value="Submit">
-    </form>
-    <h1>Result</h1>
-    <p>Answer: {{ answer }}</p>
+  <form action="/" method="post" enctype="multipart/form-data">
+      <label for="file">Upload a PDF:</label>
+      <input type="file" name="file"><br><br>
+
+      <label for="question">Ask a question:</label>
+      <input type="text" name="question" placeholder="Enter your question" required><br><br>
+
+      <input type="submit" value="Submit">
+  </form>
+
+  {% if answer %}
+      <h2>Answer:</h2>
+      <p><strong>Question:</strong> {{ question }}</p>
+      <p><strong>Answer:</strong> {{ answer }}</p>
+  {% endif %}
 </body>
 </html>

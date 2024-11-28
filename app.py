@@ -1,69 +1,52 @@
-from flask import Flask, render_template, request, flash, session
+from flask import Flask, render_template, request, flash, session, redirect, url_for
 import PyPDF2
 from transformers import pipeline
 import os
 
 app = Flask(__name__)
+app.secret_key = "your_secret_key"
 
 # Load the pre-trained question-answering model
 nlp = pipeline("question-answering")
 
-UPLOAD_FOLDER = 'uploads/'
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
-
 @app.route("/", methods=["GET", "POST"])
 def index():
+    answer = None
+    question = None
+
     if request.method == "POST":
-        try:
-            # Check if a file is uploaded
-            if "file" not in request.files:
-                flash("No file uploaded", "error")
-                return render_template("index.html")
+        # Check if a file is uploaded or already exists in the session
+        if not session.get("pdf_text") or ("file" in request.files and request.files["file"].filename):
+            if "file" not in request.files or not request.files["file"].filename:
+                flash("Please upload a PDF before asking a question.", "error")
+                return redirect(url_for("index"))
 
             file = request.files["file"]
-            filename = file.filename
-            file_path = os.path.join(UPLOAD_FOLDER, filename)
+            try:
+                # Extract text from the uploaded PDF and store in session
+                pdf_text = extract_text_from_pdf(file)
+                session["pdf_text"] = pdf_text
+                flash("PDF uploaded successfully.", "success")
+            except Exception as e:
+                flash(f"Error processing PDF: {e}", "error")
+                return redirect(url_for("index"))
 
-            file.save(file_path)
+        # Retrieve the PDF text from the session
+        pdf_text = session.get("pdf_text")
 
-            # Ensure the file is a PDF
-            if not file.filename.endswith(".pdf"):
-                flash("Only PDF files are allowed", "error")
-                return render_template("index.html")
+        # Handle the user's question
+        question = request.form.get("question", "").strip()
+        if not question:
+            flash("Please enter a question.", "error")
+            return redirect(url_for("index"))
 
-            # Extract text from PDF
-            pdf_text = extract_text_from_pdf(file)
-            if not pdf_text.strip():
-                flash("Failed to extract text from the PDF", "error")
-                return render_template("index.html")
-            
-            # session["pdf_text"] = pdf_text  # Save extracted text
-            # session["file_path"] = file_path  # Save file path for reference
-            # flash("PDF uploaded successfully! You can now ask questions.", "success")
-
-            # Preprocess the extracted text
-            preprocessed_text = preprocess_text(pdf_text)
-
-            # Get the user's question
-            question = request.form.get("question", "").strip()
-            if not question:
-                flash("Please enter a question", "error")
-                return render_template("index.html")
-
-            # Generate the answer using the question-answering model
-            answer = answer_question(preprocessed_text, question)
-
-            return render_template("index.html", question=question, answer=answer)
-
-        except Exception as e:
+        try:
+            # Generate an answer using the question-answering model
+            answer = answer_question(pdf_text, question)
+        except Exception as e: 
             flash(f"An error occurred: {e}", "error")
-            return render_template("index.html")
 
-    # GET request
-    return render_template("index.html")
-
-    # return render_template("index.html")
+    return render_template("index.html", answer=answer, question=question) 
 
 # @app.route("/process", methods=["POST"])
 # def process():
@@ -80,8 +63,8 @@ def index():
 #     # Generate the answer using the question-answering model
 #     answer = answer_question(preprocessed_text, question)
 
-#     return render_template("result.html", answer=answer)
-#     # return render_template("index.html", answer=answer)
+#     return render_template("result.html", answer=answer)  
+
 
 def extract_text_from_pdf(file):
     pdf_reader = PyPDF2.PdfReader(file)
@@ -89,12 +72,6 @@ def extract_text_from_pdf(file):
     for page in pdf_reader.pages:
         text += page.extract_text()
     return text
-    # with open(file_path, 'rb') as file:
-    #     pdf_reader = PyPDF2.PdfReader(file)
-    #     text = ""
-    #     for page in pdf_reader.pages:
-    #         text += page.extract_text()
-    # return text
 
 
 def preprocess_text(text):
