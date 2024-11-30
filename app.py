@@ -13,6 +13,9 @@ UPLOAD_FOLDER = 'uploads/'
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
+# Global variable to simulate progress
+progress = 0
+
 def get_saved_pdf():
     # Check for a saved PDF in the upload folder
     for filename in os.listdir(UPLOAD_FOLDER):
@@ -24,6 +27,10 @@ def get_saved_pdf():
 def index():
     saved_pdf = get_saved_pdf()
     pdf_text = None
+
+    # Ensure qa_history is initialized in session
+    if 'qa_history' not in session:
+        session['qa_history'] = []
 
     if request.method == "POST":
         if "file" in request.files and request.files["file"].filename != "":
@@ -49,16 +56,14 @@ def index():
                     preprocessed_text = preprocess_text(pdf_text)
                     answer = answer_question(preprocessed_text, question)
 
-                    # Save question and answer to session
-                    if "qa_history" not in session:
-                        session["qa_history"] = []
-                    session["qa_history"].append({"question": question, "answer": answer})
+                    # Append new Q&A to history and save to session
+                    session['qa_history'].append({"question": question, "answer": answer})
+                    session.modified = True  # Ensure session is updated with new data
 
-                    return render_template("index.html", saved_pdf=saved_pdf, qa_history=session["qa_history"])
-                else:
-                    flash("Failed to extract text from the PDF", "error")
+                    return render_template("index.html", saved_pdf=saved_pdf, qa_history=session.get("qa_history", []))
 
     return render_template("index.html", saved_pdf=saved_pdf, qa_history=session.get("qa_history", []))
+
 
 def extract_text_from_pdf(file_path):
     with open(file_path, 'rb') as file:
