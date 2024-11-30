@@ -1,78 +1,72 @@
-from flask import Flask, render_template, request, flash, session, redirect, url_for
+from flask import Flask, render_template, request, flash, session
 import PyPDF2
 from transformers import pipeline
 import os
 
 app = Flask(__name__)
-app.secret_key = "your_secret_key"
+app.secret_key = "your_secret_key"  # Ensure to use a secure secret key
 
 # Load the pre-trained question-answering model
 nlp = pipeline("question-answering")
 
+UPLOAD_FOLDER = 'uploads/'
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
+
+def get_saved_pdf():
+    # Check for a saved PDF in the upload folder
+    for filename in os.listdir(UPLOAD_FOLDER):
+        if filename.endswith(".pdf"):
+            return filename
+    return None
+
 @app.route("/", methods=["GET", "POST"])
 def index():
-    answer = None
-    question = None
+    saved_pdf = get_saved_pdf()
+    pdf_text = None
 
     if request.method == "POST":
-        # Check if a file is uploaded or already exists in the session
-        if not session.get("pdf_text") or ("file" in request.files and request.files["file"].filename):
-            if "file" not in request.files or not request.files["file"].filename:
-                flash("Please upload a PDF before asking a question.", "error")
-                return redirect(url_for("index"))
-
+        if "file" in request.files and request.files["file"].filename != "":
             file = request.files["file"]
-            try:
-                # Extract text from the uploaded PDF and store in session
-                pdf_text = extract_text_from_pdf(file)
-                session["pdf_text"] = pdf_text
-                flash("PDF uploaded successfully.", "success")
-            except Exception as e:
-                flash(f"Error processing PDF: {e}", "error")
-                return redirect(url_for("index"))
+            if file.filename.endswith(".pdf"):
+                file_path = os.path.join(UPLOAD_FOLDER, file.filename)
+                file.save(file_path)
+                pdf_text = extract_text_from_pdf(file_path)
+                saved_pdf = file.filename
+                session["qa_history"] = []  # Reset the history on new file upload
+                flash("PDF uploaded successfully!", "success")
+            else:
+                flash("Only PDF files are allowed", "error")
 
-        # Retrieve the PDF text from the session
-        pdf_text = session.get("pdf_text")
-
-        # Handle the user's question
         question = request.form.get("question", "").strip()
-        if not question:
-            flash("Please enter a question.", "error")
-            return redirect(url_for("index"))
+        if question:
+            if not saved_pdf:
+                flash("No PDF file uploaded. Please upload a PDF file first.", "error")
+            else:
+                if not pdf_text:
+                    pdf_text = extract_text_from_pdf(os.path.join(UPLOAD_FOLDER, saved_pdf))
+                if pdf_text:
+                    preprocessed_text = preprocess_text(pdf_text)
+                    answer = answer_question(preprocessed_text, question)
 
-        try:
-            # Generate an answer using the question-answering model
-            answer = answer_question(pdf_text, question)
-        except Exception as e: 
-            flash(f"An error occurred: {e}", "error")
+                    # Save question and answer to session
+                    if "qa_history" not in session:
+                        session["qa_history"] = []
+                    session["qa_history"].append({"question": question, "answer": answer})
 
-    return render_template("index.html", answer=answer, question=question) 
+                    return render_template("index.html", saved_pdf=saved_pdf, qa_history=session["qa_history"])
+                else:
+                    flash("Failed to extract text from the PDF", "error")
 
-# @app.route("/process", methods=["POST"])
-# def process():
-#     # Get the uploaded PDF file
-#     file = request.files["file"]
-#     pdf_text = extract_text_from_pdf(file)
+    return render_template("index.html", saved_pdf=saved_pdf, qa_history=session.get("qa_history", []))
 
-#     # Preprocess the extracted text
-#     preprocessed_text = preprocess_text(pdf_text)
-
-#     # Get the user's question
-#     question = request.form["question"]
-
-#     # Generate the answer using the question-answering model
-#     answer = answer_question(preprocessed_text, question)
-
-#     return render_template("result.html", answer=answer)  
-
-
-def extract_text_from_pdf(file):
-    pdf_reader = PyPDF2.PdfReader(file)
-    text = ""
-    for page in pdf_reader.pages:
-        text += page.extract_text()
+def extract_text_from_pdf(file_path):
+    with open(file_path, 'rb') as file:
+        pdf_reader = PyPDF2.PdfReader(file)
+        text = ""
+        for page in pdf_reader.pages:
+            text += page.extract_text()
     return text
-
 
 def preprocess_text(text):
     # Implement any necessary preprocessing steps here

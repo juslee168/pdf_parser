@@ -2,23 +2,113 @@
 <html>
 <head>
     <title>PDF Q&A App</title>
+    <style>
+        body {
+            background-color: #f0f8ff;
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+        input[type="file"],
+        input[type="text"] {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 16px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        input[type="submit"] {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        input[type="submit"]:hover {
+            background-color: #0056b3;
+        }
+        .flash-message {
+            margin-bottom: 20px;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .flash-error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .flash-success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .qa-history {
+            margin-top: 20px;
+        }
+        .qa-item {
+            margin-bottom: 20px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            background-color: #f9f9f9;
+        }
+        .qa-item p {
+            margin: 5px 0;
+        }
+    </style>
 </head>
 <body>
 
-  <form action="/" method="post" enctype="multipart/form-data">
-      <label for="file">Upload a PDF:</label>
-      <input type="file" name="file"><br><br>
+<div class="container">
+    <h1>PDF Q&A App</h1>
 
-      <label for="question">Ask a question:</label>
-      <input type="text" name="question" placeholder="Enter your question" required><br><br>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="flash-message flash-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
 
-      <input type="submit" value="Submit">
-  </form>
+    <form action="/" method="post" enctype="multipart/form-data">
+        <label for="file">Upload a PDF:</label>
+        <input type="file" name="file"><br><br>
 
-  {% if answer %}
-      <h2>Answer:</h2>
-      <p><strong>Question:</strong> {{ question }}</p>
-      <p><strong>Answer:</strong> {{ answer }}</p>
-  {% endif %}
+        <label for="question">Ask a question:</label>
+        <input type="text" name="question" placeholder="Enter your question"><br><br>
+
+        <input type="submit" value="Submit">
+    </form>
+
+    {% if not saved_pdf %}
+        <p>No PDF file uploaded. Please upload a PDF file first.</p>
+    {% else %}
+        <p>Saved PDF: {{ saved_pdf }}</p>
+    {% endif %}
+
+    {% if qa_history %}
+        <div class="qa-history">
+            <h2>Question and Answer History</h2>
+            {% for item in qa_history %}
+                <div class="qa-item">
+                    <p><strong>Question:</strong> {{ item.question }}</p>
+                    <p><strong>Answer:</strong> {{ item.answer }}</p>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+</div>
+
 </body>
 </html>
